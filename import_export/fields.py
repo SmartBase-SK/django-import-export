@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 from decimal import Decimal
 from django.contrib.contenttypes.models import ContentType
+from django.db import DatabaseError
 from django.utils import translation
 from faker.providers import currency
 from parler.utils.context import switch_language
@@ -13,6 +14,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.manager import Manager
 from django.db.models.fields import NOT_PROVIDED
 
+Product = get_model('catalog', 'Product')
+""" :type:  core.catalog.models.Product"""
 Price = get_model('pricing', 'Price')
 """ :type:  core.pricing.models.Price"""
 Currency = get_model('pricing', 'Currency')
@@ -128,7 +131,11 @@ class Field(object):
             attrs = self.attribute.split('__')
             for attr in attrs[:-1]:
                 obj = getattr(obj, attr, None)
-            setattr(obj, attrs[-1], self.clean(data))
+            # for ID field return, anyways the id will be lost!
+            if attrs[-1] is 'id':
+                return
+            else:
+                setattr(obj, attrs[-1], self.clean(data))
 
     def export(self, obj):
         """
@@ -171,10 +178,6 @@ class TranslatableField(Field):
             return value
 
     def save(self, obj, data):
-        """
-        If this field is not declared readonly, the object's attribute will
-        be set to the value returned by :meth:`~import_export.fields.Field.clean`.
-        """
         if not self.readonly:
             tmp = self.attribute.split('_')
             attr_name = "_".join(tmp[:-1])
@@ -210,39 +213,26 @@ class PriceField(Field):
         return value
 
     def save(self, obj, data):
-        """
-        If this field is not declared readonly, the object's attribute will
-        be set to the value returned by :meth:`~import_export.fields.Field.clean`.
-        """
-        if not self.readonly:
-            tmp = self.attribute.split('_')
-            attr_name = "_".join(tmp[:-4])
-            attr_currency = tmp[-1]
-            attr_tax_ratio = tmp[-2]
-            attr_tax_ratio = Decimal(attr_tax_ratio)
-            value = self.clean(data)
+        tmp = self.attribute.split('_')
+        attr_name = "_".join(tmp[:-4])
+        attr_currency = tmp[-1]
+        attr_tax_ratio = tmp[-2]
+        attr_tax_ratio = Decimal(attr_tax_ratio)
+        value = self.clean(data)
 
-            if value is '' or value is None:
-                return
-            else:
-                value = Decimal(value)
-                related_object_type = ContentType.objects.get_for_model(obj)
-                # if not dry_run:
-                obj.save()
-                price, created = Price.objects.update_or_create(
-                    content_type_id=related_object_type.id,
-                    object_id=obj.id,
-                    currency=Currency.objects.get(code=attr_currency),
-                    tax_ratio=TaxRatio.objects.get(percentage=attr_tax_ratio),
-                    defaults={attr_name: value}
-                )
+        if value is '' or value is None:
+            return
+        else:
+            value = Decimal(value)
+            related_object_type = ContentType.objects.get_for_model(obj)
 
-                # else:
-                # Price(content_type_id=related_object_type.id,
-                #     object_id=obj.id,
-                #     currency=Currency.objects.get(code=attr_currency),
-                #     tax_ratio=TaxRatio.objects.get(percentage=attr_tax_ratio),
-                #       **{attr_name: value})
+            price, created = Price.objects.update_or_create(
+                content_type_id=related_object_type.id,
+                object_id=obj.id,
+                currency=Currency.objects.get(code=attr_currency),
+                tax_ratio=TaxRatio.objects.get(percentage=attr_tax_ratio),
+                defaults={attr_name: value}
+            )
 
 
 class AttributeField(Field):
@@ -262,10 +252,6 @@ class AttributeField(Field):
         return att_value.value.name
 
     def save(self, obj, data):
-        """
-        If this field is not declared readonly, the object's attribute will
-        be set to the value returned by :meth:`~import_export.fields.Field.clean`.
-        """
         if not self.readonly:
             tmp = self.attribute.split('_')
             attr_type = "_".join(tmp[1:])
@@ -274,10 +260,44 @@ class AttributeField(Field):
             if value is '' or value is None:
                 return
             else:
-                obj.save()
                 attr, created = AttributeOptionGroupValue.objects.update_or_create(
                     product=obj,
                     group=AttributeOptionGroup.objects.get(name=attr_type),
-                    value=AttributeOption.objects.get(name=value),
+                    defaults={'value': AttributeOption.objects.get(name=value)},
                 )
 
+
+class ParentField(Field):
+    def get_value(self, obj):
+
+        try:
+            if not obj.get_parent():
+                return ''
+
+            with switch_language(obj, 'sk'):
+                with switch_language(obj.get_parent(), 'sk'):
+                    parent_slug = obj.get_parent().slug
+                    return parent_slug
+
+        except (ValueError, ObjectDoesNotExist):
+            return None
+
+    def save(self, obj, data):
+        """
+        If this field is not declared readonly, the object's attribute will
+        be set to the value returned by :meth:`~import_export.fields.Field.clean`.
+        """
+        if not self.readonly:
+            value = self.clean(data)
+
+            if obj.is_parent or value is '' or value is None:
+                return
+            else:
+                translation.activate('sk')
+                parent_obj = Product.objects.get(translations__slug=value)
+                if obj not in parent_obj.get_children():
+                    if obj.get_parent() is None:
+                        obj.id = None
+                        parent_obj.add_child(instance=obj)
+                    else:
+                        obj.move(parent_obj, 'last-child')

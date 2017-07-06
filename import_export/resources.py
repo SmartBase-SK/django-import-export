@@ -20,7 +20,7 @@ from django.utils import six
 from django.utils.safestring import mark_safe
 
 from . import widgets
-from .fields import Field
+from .fields import Field, PriceField, AttributeField, ParentField
 from .instance_loaders import ModelInstanceLoader
 from .results import Error, Result, RowResult
 
@@ -355,6 +355,16 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                     continue
                 self.import_field(field, obj, data)
 
+    def save_custom_fields(self, obj, data, using_transactions, dry_run):
+        if not using_transactions or dry_run:
+            # we don't have transactions and we want to do a dry_run
+            pass
+        else:
+            for field in self.get_import_fields():
+                if not isinstance(field, (PriceField, AttributeField, ParentField)):
+                    continue
+                field.save(obj, data)
+
     def for_delete(self, row, instance):
         """
         Returns ``True`` if ``row`` importing should delete instance.
@@ -466,6 +476,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                     with transaction.atomic():
                         self.save_instance(instance, using_transactions, dry_run)
                     self.save_m2m(instance, row, using_transactions, dry_run)
+                    self.save_custom_fields(instance, row, using_transactions, dry_run)
                 diff.compare_with(self, instance, dry_run)
             row_result.diff = diff.as_html()
             # Add object info to RowResult for LogEntry
