@@ -55,14 +55,14 @@ if isinstance(TMP_STORAGE_CLASS, six.string_types):
 #: These are the default formats for import and export. Whether they can be
 #: used or not is depending on their implementation in the tablib library.
 DEFAULT_FORMATS = (
-    base_formats.CSV,
+    # base_formats.CSV,
     base_formats.XLS,
     base_formats.XLSX,
-    base_formats.TSV,
-    base_formats.ODS,
-    base_formats.JSON,
-    base_formats.YAML,
-    base_formats.HTML,
+    # base_formats.TSV,
+    # base_formats.ODS,
+    # base_formats.JSON,
+    # base_formats.YAML,
+    # base_formats.HTML,
 )
 
 
