@@ -7,7 +7,7 @@ from django.utils import translation
 from faker.providers import currency
 from parler.utils.context import switch_language
 
-from django_smartshop.core.loading import get_model
+from sbcore.loading import get_model
 from . import widgets
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -291,7 +291,10 @@ class ParentField(Field):
             value = self.clean(data)
 
             if obj.is_parent or value is '' or value is None:
-                return
+                if obj.id is None:
+                    obj.add_root(instance=obj)
+                else:
+                    return
             else:
                 translation.activate('sk')
                 parent_obj = Product.objects.get(translations__slug=value)
