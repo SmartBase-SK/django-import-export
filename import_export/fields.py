@@ -200,17 +200,30 @@ class PriceField(Field):
         if self.attribute is None:
             return None
 
-        tmp = self.attribute.split('_')
-        attr_currency = tmp[-1]
-        attr_tax_ratio = tmp[-2]
+        tmp = self.attribute.split('__')
+        if 'price_lvl' in self.attribute:
+            attr_currency = tmp[-1]
+            attr_price_lvl = tmp[-3]
+            attr_price_lvl_id = int(tmp[-4].partition('(')[-1].rpartition(')')[0])
+            attr_tax_ratio = tmp[-5]
+            try:
+                price_obj = obj.prices.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio, price_level_id=attr_price_lvl_id)
+                value = price_obj._price_excluding_tax
+                return value
+            except (ValueError, ObjectDoesNotExist):
+                return None
+        else:
+            attr_currency = tmp[-1]
+            attr_tax_ratio = tmp[-2]
 
-        try:
-            price_obj = obj.prices.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio)
-            value = price_obj.price_excluding_tax
-        except (ValueError, ObjectDoesNotExist):
-            return None
+            try:
+                price_obj = obj.prices.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio, price_level=None)
+                value = price_obj._price_excluding_tax
+                return value
+            except (ValueError, ObjectDoesNotExist):
+                return None
 
-        return value
+        return None
 
     def save(self, obj, data):
         tmp = self.attribute.split('_')
@@ -238,7 +251,7 @@ class PriceField(Field):
 class AttributeField(Field):
     def get_value(self, obj):
 
-        if self.attribute is None:
+        if self.attribute is None or obj.is_parent:
             return None
 
         tmp = self.attribute.split('_')
