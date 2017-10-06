@@ -18,6 +18,8 @@ Product = get_model('catalog', 'Product')
 """ :type:  core.catalog.models.Product"""
 Price = get_model('pricing', 'Price')
 """ :type:  core.pricing.models.Price"""
+PriceLevel = get_model('pricing', 'PriceLevel')
+""" :type:  core.pricing.models.PriceLevel"""
 Currency = get_model('pricing', 'Currency')
 """ :type:  core.pricing.models.Currency"""
 TaxRatio = get_model('pricing', 'TaxRatio')
@@ -203,7 +205,6 @@ class PriceField(Field):
         tmp = self.attribute.split('__')
         if 'price_lvl' in self.attribute:
             attr_currency = tmp[-1]
-            attr_price_lvl = tmp[-3]
             attr_price_lvl_id = int(tmp[-4].partition('(')[-1].rpartition(')')[0])
             attr_tax_ratio = tmp[-5]
             try:
@@ -223,13 +224,19 @@ class PriceField(Field):
             except (ValueError, ObjectDoesNotExist):
                 return None
 
-        return None
-
     def save(self, obj, data):
-        tmp = self.attribute.split('_')
-        attr_name = "_".join(tmp[:-4])
-        attr_currency = tmp[-1]
-        attr_tax_ratio = tmp[-2]
+        tmp = self.attribute.split('__')
+        is_price_lvl = False
+        attr_price_lvl_id = None
+        if 'price_lvl' in self.attribute:
+            is_price_lvl = True
+            attr_currency = tmp[-1]
+            attr_price_lvl_id = int(tmp[-4].partition('(')[-1].rpartition(')')[0])
+            attr_tax_ratio = tmp[-5]
+        else:
+            attr_currency = tmp[-1]
+            attr_tax_ratio = tmp[-2]
+
         attr_tax_ratio = Decimal(attr_tax_ratio)
         value = self.clean(data)
 
@@ -244,7 +251,8 @@ class PriceField(Field):
                 object_id=obj.id,
                 currency=Currency.objects.get(code=attr_currency),
                 tax_ratio=TaxRatio.objects.get(percentage=attr_tax_ratio),
-                defaults={attr_name: value}
+                price_level=PriceLevel.objects.get(pk=attr_price_lvl_id) if is_price_lvl else None,
+                defaults={'_price_excluding_tax': value}
             )
 
 
@@ -254,11 +262,12 @@ class AttributeField(Field):
         if self.attribute is None or obj.is_parent:
             return None
 
-        tmp = self.attribute.split('_')
-        attr_type = "_".join(tmp[1:])
+        tmp = self.attribute.split('__')
+        attr_id = int(tmp[1].partition('(')[-1].rpartition(')')[0])
 
         try:
-            att_value = obj.option_values.get(group__name=attr_type)
+            att_value = obj.option_values.get(group_id=attr_id)
+
         except (ValueError, ObjectDoesNotExist):
             return None
 
@@ -266,8 +275,9 @@ class AttributeField(Field):
 
     def save(self, obj, data):
         if not self.readonly:
-            tmp = self.attribute.split('_')
-            attr_type = "_".join(tmp[1:])
+            tmp = self.attribute.split('__')
+            attr_id = int(tmp[1].partition('(')[-1].rpartition(')')[0])
+            is_active = True if 'active' in tmp[1] else False
             value = self.clean(data)
 
             if value is '' or value is None:
@@ -275,7 +285,7 @@ class AttributeField(Field):
             else:
                 attr, created = AttributeOptionGroupValue.objects.update_or_create(
                     product=obj,
-                    group=AttributeOptionGroup.objects.get(name=attr_type),
+                    group=AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active),
                     defaults={'value': AttributeOption.objects.get(name=value)},
                 )
 
@@ -310,7 +320,12 @@ class ParentField(Field):
                     return
             else:
                 translation.activate('sk')
-                parent_obj = Product.objects.get(translations__slug=value)
+                parent_obj = None
+                try:
+                    parent_obj = Product.objects.get(translations__slug=value)
+                except Exception as e:
+                    raise ValueError('ERROR: in product: "{}" - Parent slug: "{}" DOES NOT EXIST'.format(obj.name, value))
+
                 if obj not in parent_obj.get_children():
                     if obj.get_parent() is None:
                         obj.id = None
