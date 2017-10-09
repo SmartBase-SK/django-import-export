@@ -30,6 +30,9 @@ AttributeOptionGroup = get_model('catalog', 'AttributeOptionGroup')
 """ :type:  core.catalog.models.AttributeOptionGroup"""
 AttributeOption = get_model('catalog', 'AttributeOption')
 """ :type:  core.catalog.models.AttributeOption"""
+CarouselImages = get_model('catalog', 'CarouselImages')
+""" :type:  core.catalog.models.CarouselImages"""
+
 
 class Field(object):
     """
@@ -256,6 +259,37 @@ class PriceField(Field):
             )
 
 
+class CarouselImageField(Field):
+    # def get_value(self, obj):
+    #
+    #     if self.attribute is None:
+    #         return None
+    #
+    #     try:
+    #         price_obj = obj.carousel_images.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio, price_level_id=attr_price_lvl_id)
+    #         value = price_obj._price_excluding_tax
+    #         return value
+    #     except (ValueError, ObjectDoesNotExist):
+    #         return None
+
+    def save(self, obj, data):
+
+        values = self.clean(data)
+
+        for image in values:
+            related_object_type = ContentType.objects.get_for_model(obj)
+
+            # myid = CarouselImages.objects.filter(image=image, content_type_id=related_object_type.id, object_id=obj.id)
+            # if len(myid) == 0:
+            #     # New carousel image relation
+
+            carousel_image, created = CarouselImages.objects.update_or_create(
+                content_type_id=related_object_type.id,
+                object_id=obj.id,
+                defaults={'image': image}
+            )
+            asd = 0
+
 class AttributeField(Field):
     def get_value(self, obj):
 
@@ -277,16 +311,17 @@ class AttributeField(Field):
         if not self.readonly:
             tmp = self.attribute.split('__')
             attr_id = int(tmp[1].partition('(')[-1].rpartition(')')[0])
-            is_active = True if 'active' in tmp[1] else False
+            is_active = False if 'notactive' in tmp[1] else True
             value = self.clean(data)
 
             if value is '' or value is None:
                 return
             else:
+                group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
                 attr, created = AttributeOptionGroupValue.objects.update_or_create(
                     product=obj,
-                    group=AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active),
-                    defaults={'value': AttributeOption.objects.get(name=value)},
+                    group=group,
+                    defaults={'value': AttributeOption.objects.get(name=value, group=group, product_class=obj.product_class)},
                 )
 
 
