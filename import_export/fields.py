@@ -260,35 +260,22 @@ class PriceField(Field):
 
 
 class CarouselImageField(Field):
-    # def get_value(self, obj):
-    #
-    #     if self.attribute is None:
-    #         return None
-    #
-    #     try:
-    #         price_obj = obj.carousel_images.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio, price_level_id=attr_price_lvl_id)
-    #         value = price_obj._price_excluding_tax
-    #         return value
-    #     except (ValueError, ObjectDoesNotExist):
-    #         return None
 
     def save(self, obj, data):
 
         values = self.clean(data)
-
+        obj.carousel_images.clear()
         for image in values:
+
             related_object_type = ContentType.objects.get_for_model(obj)
 
-            # myid = CarouselImages.objects.filter(image=image, content_type_id=related_object_type.id, object_id=obj.id)
-            # if len(myid) == 0:
-            #     # New carousel image relation
-
-            carousel_image, created = CarouselImages.objects.update_or_create(
+            carousel_image = CarouselImages(
                 content_type_id=related_object_type.id,
                 object_id=obj.id,
-                defaults={'image': image}
+                image=image
             )
-            asd = 0
+            obj.carousel_images.add(carousel_image, bulk=False)
+
 
 class AttributeField(Field):
     def get_value(self, obj):

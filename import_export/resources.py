@@ -470,14 +470,14 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                     diff.compare_with(self, None, dry_run)
             else:
                 self.import_obj(instance, row, dry_run)
+
+                with transaction.atomic():
+                    self.save_instance(instance, using_transactions, dry_run)
+                self.save_m2m(instance, row, using_transactions, dry_run)
+                self.save_custom_fields(instance, row, using_transactions, dry_run)
+                diff.compare_inside(self, instance, dry_run)
                 if not diff.is_change:
                     row_result.import_type = RowResult.IMPORT_TYPE_SKIP
-                else:
-                    with transaction.atomic():
-                        self.save_instance(instance, using_transactions, dry_run)
-                    self.save_m2m(instance, row, using_transactions, dry_run)
-                    self.save_custom_fields(instance, row, using_transactions, dry_run)
-                diff.compare_with(self, instance, dry_run)
             row_result.diff = diff.as_html()
             # Add object info to RowResult for LogEntry
             if row_result.import_type != RowResult.IMPORT_TYPE_SKIP:
