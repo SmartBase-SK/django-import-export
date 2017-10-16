@@ -196,6 +196,10 @@ class TranslatableField(Field):
                     else:
                         setattr(obj, attr_name, self.clean(data))
                 else:
+                    if attr_name == 'slug' and not obj.get_slug and Product.objects.translated(slug=self.clean(data)).exists():
+                        raise ValueError(
+                            'ERROR: in item: "{}" - Slug: "{}" ALREADY EXISTS. Slug has to be UNIQUE!'.format(obj.name,
+                                                                                        self.clean(data)))
                     setattr(obj, attr_name, self.clean(data))
 
 
@@ -305,10 +309,21 @@ class AttributeField(Field):
                 return
             else:
                 group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
+                attr_option = AttributeOption.objects.filter(product_class=obj.product_class, group=group, name=value)
+                if attr_option.count() == 0:
+                    attr_option = AttributeOption(
+                        product_class=obj.product_class,
+                        group=group,
+                        name=value
+                    )
+                    attr_option.save()
+                else:
+                    attr_option = attr_option.first()
+
                 attr, created = AttributeOptionGroupValue.objects.update_or_create(
                     product=obj,
                     group=group,
-                    defaults={'value': AttributeOption.objects.get(name=value, group=group, product_class=obj.product_class)},
+                    defaults={'value': attr_option},
                 )
 
 
