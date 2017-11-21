@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-
+import re
 
 class BaseInstanceLoader(object):
     """
@@ -29,7 +29,14 @@ class ModelInstanceLoader(BaseInstanceLoader):
             params = {}
             for key in self.resource.get_import_id_fields():
                 field = self.resource.fields[key]
-                params[field.attribute] = field.clean(row)
+                if not field.clean(row):
+                    # if NO id is set
+                    r = re.compile("slug_*")
+                    for field_i in self.resource.get_fields():
+                        if r.match(field_i.attribute):
+                            return self.get_queryset().translated(slug=row[field_i.attribute]).first()
+                else:
+                    params[field.attribute] = field.clean(row)
             return self.get_queryset().get(**params)
         except self.resource._meta.model.DoesNotExist:
             return None
