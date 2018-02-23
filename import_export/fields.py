@@ -263,6 +263,66 @@ class PriceField(Field):
             )
 
 
+class OldPriceField(PriceField):
+    def get_value(self, obj):
+
+        if self.attribute is None:
+            return None
+
+        tmp = self.attribute.split('__')
+        if 'price_lvl' in self.attribute:
+            attr_currency = tmp[-1]
+            attr_price_lvl_id = int(tmp[-4].partition('(')[-1].rpartition(')')[0])
+            attr_tax_ratio = tmp[-5]
+            try:
+                price_obj = obj.prices.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio, price_level_id=attr_price_lvl_id)
+                value = price_obj.old_price_excluding_tax()
+                return value
+            except (ValueError, ObjectDoesNotExist):
+                return None
+        else:
+            attr_currency = tmp[-1]
+            attr_tax_ratio = tmp[-2]
+
+            try:
+                price_obj = obj.prices.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio, price_level=None)
+                value = price_obj.old_price_excluding_tax()
+                return value
+            except (ValueError, ObjectDoesNotExist):
+                return None
+
+    def save(self, obj, data):
+        tmp = self.attribute.split('__')
+        is_price_lvl = False
+        attr_price_lvl_id = None
+        if 'price_lvl' in self.attribute:
+            is_price_lvl = True
+            attr_currency = tmp[-1]
+            attr_price_lvl_id = int(tmp[-4].partition('(')[-1].rpartition(')')[0])
+            attr_tax_ratio = tmp[-5]
+        else:
+            attr_currency = tmp[-1]
+            attr_tax_ratio = tmp[-2]
+
+        attr_tax_ratio = Decimal(attr_tax_ratio)
+        value = self.clean(data)
+
+        if value is '' or value is None:
+            return
+        else:
+            value = Decimal(value)
+            related_object_type = ContentType.objects.get_for_model(obj)
+
+            price, created = Price.objects.update_or_create(
+                content_type_id=related_object_type.id,
+                object_id=obj.id,
+                currency=Currency.objects.get(code=attr_currency),
+                tax_ratio=TaxRatio.objects.get(percentage=attr_tax_ratio),
+                price_level=PriceLevel.objects.get(pk=attr_price_lvl_id) if is_price_lvl else None,
+                defaults={'_old_price_excluding_tax': value}
+            )
+
+
 class CarouselImageField(Field):
 
     def save(self, obj, data):
