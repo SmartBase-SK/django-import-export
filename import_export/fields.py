@@ -32,8 +32,6 @@ AttributeOption = get_model('catalog', 'AttributeOption')
 """ :type:  core.catalog.models.AttributeOption"""
 CarouselImages = get_model('catalog', 'CarouselImages')
 """ :type:  core.catalog.models.CarouselImages"""
-ProductRecommendedAccessory = get_model('catalog', 'ProductRecommendedAccessory')
-""" :type:  core.catalog.models.ProductRecommendedAccessory"""
 
 
 class Field(object):
@@ -430,17 +428,3 @@ class ParentField(Field):
                     else:
                         obj.move(parent_obj, 'last-child')
 
-
-class ProductRecommendedAccessoryField(Field):
-    def save(self, obj, data):
-        value = self.clean(data)
-        if value is None or len(value) == 0:
-            return
-        else:
-            related_object_type = ContentType.objects.get_for_model(obj)
-            for accessory_product in value:
-                accessory, created = ProductRecommendedAccessory.objects.update_or_create(
-                    content_type_id=related_object_type.id,
-                    object_id=obj.id,
-                    accessory=Product.objects.get(order_no=accessory_product)
-                )
