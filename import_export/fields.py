@@ -32,6 +32,8 @@ AttributeOption = get_model('catalog', 'AttributeOption')
 """ :type:  core.catalog.models.AttributeOption"""
 CarouselImages = get_model('catalog', 'CarouselImages')
 """ :type:  core.catalog.models.CarouselImages"""
+ProductRecommendedAccessory = get_model('catalog', 'ProductRecommendedAccessory')
+""" :type:  core.catalog.models.ProductRecommendedAccessory"""
 
 
 class Field(object):
@@ -199,7 +201,7 @@ class TranslatableField(Field):
                     if attr_name == 'slug' and not obj.get_slug and Product.objects.translated(slug=self.clean(data)).exists():
                         raise ValueError(
                             'ERROR: in item: "{}" - Slug: "{}" ALREADY EXISTS. Slug has to be UNIQUE!'.format(obj.name,
-                                                                                        self.clean(data)))
+                                                                                                            self.clean(data)))
                     setattr(obj, attr_name, self.clean(data))
 
 
@@ -326,11 +328,9 @@ class OldPriceField(PriceField):
 class CarouselImageField(Field):
 
     def save(self, obj, data):
-
         values = self.clean(data)
         obj.carousel_images.clear()
         for image in values:
-
             related_object_type = ContentType.objects.get_for_model(obj)
 
             carousel_image = CarouselImages(
@@ -369,7 +369,7 @@ class AttributeField(Field):
                 return
             else:
                 group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
-                attr_option = AttributeOption.objects.filter(product_class=obj.product_class, group=group, name=value)
+                attr_option = AttributeOption.objects.filter(product_class=obj.product_class, group=group, translations__name=value)
                 if attr_option.count() == 0:
                     attr_option = AttributeOption(
                         product_class=obj.product_class,
@@ -429,3 +429,18 @@ class ParentField(Field):
                         parent_obj.add_child(instance=obj)
                     else:
                         obj.move(parent_obj, 'last-child')
+
+
+class ProductRecommendedAccessoryField(Field):
+    def save(self, obj, data):
+        value = self.clean(data)
+        if value is None or len(value) == 0:
+            return
+        else:
+            related_object_type = ContentType.objects.get_for_model(obj)
+            for accessory_product in value:
+                accessory, created = ProductRecommendedAccessory.objects.update_or_create(
+                    content_type_id=related_object_type.id,
+                    object_id=obj.id,
+                    accessory=Product.objects.get(order_no=accessory_product)
+                )
