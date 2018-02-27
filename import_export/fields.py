@@ -191,7 +191,7 @@ class TranslatableField(Field):
                 value = value()
             return value
 
-    def save(self, obj, data):
+    def save(self, obj, data, is_m2m=False):
         if not self.readonly:
             tmp = self.attribute.split('_')
             attr_name = "_".join(tmp[:-1])
@@ -199,18 +199,19 @@ class TranslatableField(Field):
             with switch_language(obj, attr_language):
                 translation.activate(attr_language)
                 field = obj._meta.model.translations.field.model._meta.get_field(attr_name)
+                translation_model = obj.translations.get(language_code=attr_language)
                 if field.blank and not field.null and not field.is_relation:
                     if self.clean(data) is None:
-                        setattr(obj, attr_name, '')
+                        setattr(translation_model, attr_name, '')
                     else:
-                        setattr(obj, attr_name, self.clean(data))
+                        setattr(translation_model, attr_name, self.clean(data))
                 else:
                     if attr_name == 'slug' and not obj.get_slug and Product.objects.translated(slug=self.clean(data)).exists():
                         raise ValueError(
                             'ERROR: in item: "{}" - Slug: "{}" ALREADY EXISTS. Slug has to be UNIQUE!'.format(obj.name,
                                                                                                             self.clean(data)))
-                    setattr(obj, attr_name, self.clean(data))
-
+                    setattr(translation_model, attr_name, self.clean(data))
+                translation_model.save()
 
 class PriceField(Field):
     def get_value(self, obj):
@@ -240,7 +241,7 @@ class PriceField(Field):
             except (ValueError, ObjectDoesNotExist):
                 return None
 
-    def save(self, obj, data):
+    def save(self, obj, data, is_m2m=False):
         tmp = self.attribute.split('__')
         is_price_lvl = False
         attr_price_lvl_id = None
@@ -300,7 +301,7 @@ class OldPriceField(PriceField):
             except (ValueError, ObjectDoesNotExist):
                 return None
 
-    def save(self, obj, data):
+    def save(self, obj, data, is_m2m=False):
         tmp = self.attribute.split('__')
         is_price_lvl = False
         attr_price_lvl_id = None
@@ -334,7 +335,7 @@ class OldPriceField(PriceField):
 
 class CarouselImageField(Field):
 
-    def save(self, obj, data):
+    def save(self, obj, data, is_m2m=False):
         values = self.clean(data)
         obj.carousel_images.clear()
         for image in values:
@@ -365,7 +366,7 @@ class AttributeField(Field):
 
         return att_value.value.name
 
-    def save(self, obj, data):
+    def save(self, obj, data, is_m2m=False):
         if not self.readonly:
             tmp = self.attribute.split('__')
             attr_id = int(tmp[1].partition('(')[-1].rpartition(')')[0])
@@ -409,7 +410,7 @@ class ParentField(Field):
         except (ValueError, ObjectDoesNotExist):
             return None
 
-    def save(self, obj, data):
+    def save(self, obj, data, is_m2m=False):
         """
         If this field is not declared readonly, the object's attribute will
         be set to the value returned by :meth:`~import_export.fields.Field.clean`.
