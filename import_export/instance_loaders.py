@@ -33,7 +33,7 @@ class ModelInstanceLoader(BaseInstanceLoader):
                     # if NO id is set
                     r = re.compile("slug_*")
                     for field_i in self.resource.get_fields():
-                        if r.match(field_i.attribute):
+                        if type(field_i.attribute) is str and r.match(field_i.attribute):
                             return self.get_queryset().translated(slug=row[field_i.attribute]).first()
                 else:
                     params[field.attribute] = field.clean(row)

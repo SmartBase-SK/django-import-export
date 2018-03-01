@@ -192,6 +192,11 @@ class TranslatableField(Field):
             return value
 
     def save(self, obj, data, is_m2m=False):
+        # if we have translations model for obj we setting
+        # attribute to this model e.g. obj.translations.slug
+        # in case that we don't have translations model
+        # we settings attribute to obj.slug
+        # (this will be proceeded by django-parler) somehow
         if not self.readonly:
             tmp = self.attribute.split('_')
             attr_name = "_".join(tmp[:-1])
@@ -199,7 +204,9 @@ class TranslatableField(Field):
             with switch_language(obj, attr_language):
                 translation.activate(attr_language)
                 field = obj._meta.model.translations.field.model._meta.get_field(attr_name)
-                translation_model = obj.translations.get(language_code=attr_language)
+                translation_model = obj.translations.filter(language_code=attr_language).first()
+                if not translation_model:
+                    translation_model = obj
                 if field.blank and not field.null and not field.is_relation:
                     if self.clean(data) is None:
                         setattr(translation_model, attr_name, '')
@@ -211,7 +218,8 @@ class TranslatableField(Field):
                             'ERROR: in item: "{}" - Slug: "{}" ALREADY EXISTS. Slug has to be UNIQUE!'.format(obj.name,
                                                                                                             self.clean(data)))
                     setattr(translation_model, attr_name, self.clean(data))
-                translation_model.save()
+                if type(translation_model) is not type(obj):
+                    translation_model.save()
 
 class PriceField(Field):
     def get_value(self, obj):
@@ -436,5 +444,9 @@ class ParentField(Field):
                         obj.id = None
                         parent_obj.add_child(instance=obj)
                     else:
-                        obj.move(parent_obj, 'last-child')
-
+                        try:
+                            obj.move(Product.objects.get(translations__slug=value), 'last-child')
+                        except AttributeError:
+                            # because TreeBeard
+                            Product.fix_tree()
+                            obj.move(Product.objects.get(translations__slug=value), 'last-child')
