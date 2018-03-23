@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import logging
 from decimal import Decimal
 from django.contrib.contenttypes.models import ContentType
 from django.db import DatabaseError
@@ -10,7 +11,7 @@ from parler.utils.context import switch_language
 from sbcore.loading import get_model
 from . import widgets
 
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.db.models.manager import Manager
 from django.db.models.fields import NOT_PROVIDED
 from django import VERSION
@@ -33,6 +34,8 @@ AttributeOption = get_model('catalog', 'AttributeOption')
 """ :type:  core.catalog.models.AttributeOption"""
 CarouselImages = get_model('catalog', 'CarouselImages')
 """ :type:  core.catalog.models.CarouselImages"""
+
+logger = logging.getLogger(__name__)
 
 
 class Field(object):
@@ -371,6 +374,8 @@ class AttributeField(Field):
 
         except (ValueError, ObjectDoesNotExist):
             return None
+        except MultipleObjectsReturned:
+            logger.error('Export error exception. Product#id={}, attr_id={}'.format(obj.id, attr_id))
 
         return att_value.value.name
 
