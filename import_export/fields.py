@@ -375,8 +375,7 @@ class AttributeField(Field):
         except (ValueError, ObjectDoesNotExist):
             return None
         except MultipleObjectsReturned:
-            logger.error('Export error exception. Product#id={}, attr_id={}'.format(obj.id, attr_id))
-            raise MultipleObjectsReturned
+            raise MultipleObjectsReturned('Export error exception. Product#id={}, attr_id={}'.format(obj.id, attr_id))
 
         return att_value.value.name
 
