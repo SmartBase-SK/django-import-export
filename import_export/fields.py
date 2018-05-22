@@ -271,7 +271,7 @@ class PriceField(Field):
         if value is '' or value is None:
             return
         else:
-            value = Decimal(value)
+            value = round(Decimal(value), 2)
             related_object_type = ContentType.objects.get_for_model(obj)
 
             price, created = Price.objects.update_or_create(
@@ -437,21 +437,23 @@ class ParentField(Field):
                 else:
                     return
             else:
-                translation.activate('sk')
-                parent_obj = None
-                try:
-                    parent_obj = Product.objects.get(translations__slug=value)
-                except Exception as e:
-                    raise ValueError('ERROR: in product: "{}" - Parent slug: "{}" DOES NOT EXIST'.format(obj.name, value))
+                with switch_language(obj, 'sk'):
+                    translation.activate('sk')
 
-                if obj not in parent_obj.get_children():
-                    if obj.get_parent() is None:
-                        obj.id = None
-                        parent_obj.add_child(instance=obj)
-                    else:
-                        try:
-                            obj.move(Product.objects.get(translations__slug=value), 'last-child')
-                        except AttributeError:
-                            # because TreeBeard
-                            Product.fix_tree()
-                            obj.move(Product.objects.get(translations__slug=value), 'last-child')
+                    parent_obj = None
+                    try:
+                        parent_obj = Product.objects.translated(slug=value).first()
+                    except Exception as e:
+                        raise ValueError('ERROR: in product: "{}" - Parent slug: "{}" DOES NOT EXIST'.format(obj.name, value))
+
+                    if obj not in parent_obj.get_children():
+                        if obj.get_parent() is None:
+                            obj.id = None
+                            parent_obj.add_child(instance=obj)
+                        else:
+                            try:
+                                obj.move(Product.objects.translated(slug=value).first(), 'last-child')
+                            except AttributeError:
+                                # because TreeBeard
+                                Product.fix_tree()
+                                obj.move(Product.objects.translated(slug=value).first(), 'last-child')
