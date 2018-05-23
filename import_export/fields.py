@@ -439,12 +439,12 @@ class ParentField(Field):
             else:
                 with switch_language(obj, 'sk'):
                     translation.activate('sk')
-
-                    parent_obj = None
-                    try:
-                        parent_obj = Product.objects.translated(slug=value).first()
-                    except Exception as e:
-                        raise ValueError('ERROR: in product: "{}" - Parent slug: "{}" DOES NOT EXIST'.format(obj.name, value))
+                    qs = Product.objects.translated(slug=value)
+                    if qs.count() == 1:
+                        parent_obj = qs.first()
+                    else:
+                        raise ValueError(
+                            'ERROR: in product: "{}" - for slug "{}" select returned more than 1 product!'.format(obj.name, value))
 
                     if obj not in parent_obj.get_children():
                         if obj.get_parent() is None:
@@ -452,8 +452,8 @@ class ParentField(Field):
                             parent_obj.add_child(instance=obj)
                         else:
                             try:
-                                obj.move(Product.objects.translated(slug=value).first(), 'last-child')
+                                obj.move(parent_obj, 'last-child')
                             except AttributeError:
                                 # because TreeBeard
                                 Product.fix_tree()
-                                obj.move(Product.objects.translated(slug=value).first(), 'last-child')
+                                obj.move(parent_obj, 'last-child')
