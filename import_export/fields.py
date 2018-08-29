@@ -274,7 +274,7 @@ class PriceField(Field):
             value = round(Decimal(value), 2)
             related_object_type = ContentType.objects.get_for_model(obj)
 
-            price, created = Price.objects.update_or_create(
+            price, created = Price.not_nullable.update_or_create(
                 content_type_id=related_object_type.id,
                 object_id=obj.id,
                 currency=Currency.objects.get(code=attr_currency),
@@ -334,7 +334,7 @@ class OldPriceField(PriceField):
             value = Decimal(value)
             related_object_type = ContentType.objects.get_for_model(obj)
 
-            price, created = Price.objects.update_or_create(
+            price, created = Price.not_nullable.update_or_create(
                 content_type_id=related_object_type.id,
                 object_id=obj.id,
                 currency=Currency.objects.get(code=attr_currency),
