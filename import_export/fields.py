@@ -271,7 +271,7 @@ class PriceField(Field):
         if value is '' or value is None:
             return
         else:
-            value = round(Decimal(value), 2)
+            value = round(Decimal(value), 5)
             related_object_type = ContentType.objects.get_for_model(obj)
 
             price, created = Price.not_nullable.update_or_create(
