@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-
+from django.conf import settings
 import logging
 from decimal import Decimal
 from django.contrib.contenttypes.models import ContentType
@@ -415,10 +415,12 @@ class ParentField(Field):
             if not obj.get_parent():
                 return ''
 
-            with switch_language(obj, 'sk'):
-                with switch_language(obj.get_parent(), 'sk'):
-                    parent_slug = obj.get_parent().slug
-                    return parent_slug
+            for lang_short, lang_long in settings.LANGUAGES:
+                with switch_language(obj, lang_short):
+                    with switch_language(obj.get_parent(), lang_short):
+                        parent_slug = obj.get_parent().slug
+                        # return slug in language which is set FIRST in settings.LANGUAGES
+                        return parent_slug
 
         except (ValueError, ObjectDoesNotExist):
             return None
@@ -437,23 +439,27 @@ class ParentField(Field):
                 else:
                     return
             else:
-                with switch_language(obj, 'sk'):
-                    translation.activate('sk')
+                for lang_short, lang_long in settings.LANGUAGES:
+                    with switch_language(obj, lang_short):
+                        translation.activate(lang_short)
 
-                    parent_obj = None
-                    try:
-                        parent_obj = Product.objects.translated(slug=value).first()
-                    except Exception as e:
-                        raise ValueError('ERROR: in product: "{}" - Parent slug: "{}" DOES NOT EXIST'.format(obj.name, value))
+                        parent_obj = None
+                        try:
+                            parent_obj = Product.objects.translated(slug=value).first()
+                        except Exception as e:
+                            raise ValueError('ERROR: in product: "{}" - Parent slug: "{}" DOES NOT EXIST'.format(obj.name, value))
 
-                    if obj not in parent_obj.get_children():
-                        if obj.get_parent() is None:
-                            obj.id = None
-                            parent_obj.add_child(instance=obj)
-                        else:
-                            try:
-                                obj.move(Product.objects.translated(slug=value).first(), 'last-child')
-                            except AttributeError:
-                                # because TreeBeard
-                                Product.fix_tree()
-                                obj.move(Product.objects.translated(slug=value).first(), 'last-child')
+                        if obj not in parent_obj.get_children():
+                            if obj.get_parent() is None:
+                                obj.id = None
+                                parent_obj.add_child(instance=obj)
+                            else:
+                                try:
+                                    obj.move(Product.objects.translated(slug=value).first(), 'last-child')
+                                except AttributeError:
+                                    # because TreeBeard
+                                    Product.fix_tree()
+                                    obj.move(Product.objects.translated(slug=value).first(), 'last-child')
+                        # return after FIRST language in settings.LANGUAGES
+                        return
+
