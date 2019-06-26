@@ -20,6 +20,8 @@ Product = get_model('catalog', 'Product')
 """ :type:  core.catalog.models.Product"""
 Price = get_model('pricing', 'Price')
 """ :type:  core.pricing.models.Price"""
+OldPrice = get_model('pricing', 'OldPrice')
+""" :type:  core.pricing.models.OldPrice"""
 PriceLevel = get_model('pricing', 'PriceLevel')
 """ :type:  core.pricing.models.PriceLevel"""
 Currency = get_model('pricing', 'Currency')
@@ -291,39 +293,19 @@ class OldPriceField(PriceField):
             return None
 
         tmp = self.attribute.split('__')
-        if 'price_lvl' in self.attribute:
-            attr_currency = tmp[-1]
-            attr_price_lvl_id = int(tmp[-4].partition('(')[-1].rpartition(')')[0])
-            attr_tax_ratio = tmp[-5]
-            try:
-                price_obj = obj.prices.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio, price_level_id=attr_price_lvl_id)
-                value = price_obj.old_price_excluding_tax()
-                return value
-            except (ValueError, ObjectDoesNotExist):
-                return None
-        else:
-            attr_currency = tmp[-1]
-            attr_tax_ratio = tmp[-2]
-
-            try:
-                price_obj = obj.prices.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio, price_level=None)
-                value = price_obj.old_price_excluding_tax()
-                return value
-            except (ValueError, ObjectDoesNotExist):
-                return None
+        attr_currency = tmp[-1]
+        attr_tax_ratio = tmp[-5] if 'price_lvl' in self.attribute else tmp[-2]
+        try:
+            price_obj = obj.old_prices.get(currency__code=attr_currency, tax_ratio__percentage=attr_tax_ratio)
+            value = price_obj.price_excluding_tax()
+            return value
+        except (ValueError, ObjectDoesNotExist):
+            return None
 
     def save(self, obj, data, is_m2m=False):
         tmp = self.attribute.split('__')
-        is_price_lvl = False
-        attr_price_lvl_id = None
-        if 'price_lvl' in self.attribute:
-            is_price_lvl = True
-            attr_currency = tmp[-1]
-            attr_price_lvl_id = int(tmp[-4].partition('(')[-1].rpartition(')')[0])
-            attr_tax_ratio = tmp[-5]
-        else:
-            attr_currency = tmp[-1]
-            attr_tax_ratio = tmp[-2]
+        attr_currency = tmp[-1]
+        attr_tax_ratio = tmp[-5] if 'price_lvl' in self.attribute else tmp[-2]
 
         attr_tax_ratio = Decimal(attr_tax_ratio)
         value = self.clean(data)
@@ -334,13 +316,12 @@ class OldPriceField(PriceField):
             value = Decimal(value)
             related_object_type = ContentType.objects.get_for_model(obj)
 
-            price, created = Price.not_nullable.update_or_create(
+            price, created = OldPrice.objects.update_or_create(
                 content_type_id=related_object_type.id,
                 object_id=obj.id,
                 currency=Currency.objects.get(code=attr_currency),
                 tax_ratio=TaxRatio.objects.get(percentage=attr_tax_ratio),
-                price_level=PriceLevel.objects.get(pk=attr_price_lvl_id) if is_price_lvl else None,
-                defaults={'_old_price_excluding_tax': value}
+                defaults={'_price_excluding_tax': value}
             )
 
 
