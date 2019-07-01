@@ -433,7 +433,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         """
         pass
 
-    def import_row(self, row, instance_loader, using_transactions=True, dry_run=False, **kwargs):
+    def import_row(self, row, instance_loader, using_transactions=True, dry_run=False, row_number=None, **kwargs):
         """
         Imports data from ``tablib.Dataset``. Refer to :doc:`import_workflow`
         for a more complete description of the whole import process.
@@ -487,7 +487,12 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             # There is no point logging a transaction error for each row
             # when only the original error is likely to be relevant
             if not isinstance(e, TransactionManagementError):
-                logging.exception(e)
+                if row_number is not None:
+                    # +2 row_number (numbering starts from 0 and header is 0th line.
+                    # Add +2 for correct representation of line in file.)
+                    logging.exception("In row {}: {}".format(row_number+2, e))
+                else:
+                    logging.exception(e)
             tb_info = traceback.format_exc()
             row_result.errors.append(self.get_error_result_class()(e, tb_info, row))
         return row_result
@@ -553,13 +558,14 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         if collect_failed_rows:
             result.add_dataset_headers(dataset.headers)
 
-        for row in dataset.dict:
+        for row_number, row in enumerate(dataset.dict):
             with atomic_if_using_transaction(using_transactions):
                 row_result = self.import_row(
                     row,
                     instance_loader,
                     using_transactions=using_transactions,
                     dry_run=dry_run,
+                    row_number=row_number,
                     **kwargs
                 )
             result.increment_row_result_total(row_result)
