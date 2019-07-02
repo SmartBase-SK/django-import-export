@@ -1,5 +1,6 @@
 -r base.txt
 sphinx
 sphinx-rtd-theme
-mysql-python
-psycopg2==2.6.1
+mysqlclient
+psycopg2
+wheel

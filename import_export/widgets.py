@@ -1,20 +1,15 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
+import json
+from datetime import date, datetime
 from decimal import Decimal
-from datetime import datetime, date
-from django.utils import datetime_safe, timezone, six
-from django.utils.encoding import smart_text
-from django.utils.dateparse import parse_duration
+
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils import datetime_safe, timezone
+from django.utils.dateparse import parse_duration
+from django.utils.encoding import force_text, smart_text
 
-try:
-    from django.utils.encoding import force_text
-except ImportError:
-    from django.utils.encoding import force_unicode as force_text
 
-
-class Widget(object):
+class Widget:
     """
     A Widget takes care of converting between import and export representations.
 
@@ -51,6 +46,8 @@ class NumberWidget(Widget):
     """
 
     def is_empty(self, value):
+        if isinstance(value, str):
+            value = value.strip()
         # 0 is not empty
         return value is None or value == ""
 
@@ -252,17 +249,45 @@ class DurationWidget(Widget):
 
 
 class SimpleArrayWidget(Widget):
+    """
+    Widget for an Array field. Can be used for Postgres' Array field.
+
+    :param separator: Defaults to ``','``
+    """
+
     def __init__(self, separator=None):
         if separator is None:
             separator = ','
         self.separator = separator
-        super(SimpleArrayWidget, self).__init__()
+        super().__init__()
 
     def clean(self, value, row=None, *args, **kwargs):
         return value.split(self.separator) if value else []
 
     def render(self, value, obj=None):
-        return self.separator.join(six.text_type(v) for v in value)
+        return self.separator.join(str(v) for v in value)
+
+
+class JSONWidget(Widget):
+    """
+    Widget for a JSON object (especially required for jsonb fields in PostgreSQL database.)
+
+    :param value: Defaults to JSON format.
+    The widget covers two cases: Proper JSON string with double quotes, else it
+    tries to use single quotes and then convert it to proper JSON.
+    """
+
+    def clean(self, value, row=None, *args, **kwargs):
+        val = super().clean(value)
+        if val:
+            try:
+                return json.loads(val)
+            except json.decoder.JSONDecodeError:
+                return json.loads(val.replace("'", "\""))
+
+    def render(self, value, obj=None):
+        if value:
+            return json.dumps(value)
 
 
 class ForeignKeyWidget(Widget):
@@ -288,6 +313,9 @@ class ForeignKeyWidget(Widget):
     :class:`~import_export.widgets.ForeignKeyWidget` to lookup related objects
     using ``Author.name`` instead of ``Author.pk``::
 
+        from import_export import fields, resources
+        from import_export.widgets import ForeignKeyWidget
+
         class BookResource(resources.ModelResource):
             author = fields.Field(
                 column_name='author',
@@ -303,7 +331,7 @@ class ForeignKeyWidget(Widget):
     def __init__(self, model, field='pk', *args, **kwargs):
         self.model = model
         self.field = field
-        super(ForeignKeyWidget, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_queryset(self, value, row, *args, **kwargs):
         """
@@ -329,7 +357,7 @@ class ForeignKeyWidget(Widget):
         return self.model.objects.all()
 
     def clean(self, value, row=None, *args, **kwargs):
-        val = super(ForeignKeyWidget, self).clean(value)
+        val = super().clean(value)
         if val:
             return self.get_queryset(value, row, *args, **kwargs).get(**{self.field: val})
         else:
@@ -338,7 +366,19 @@ class ForeignKeyWidget(Widget):
     def render(self, value, obj=None):
         if value is None:
             return ""
-        return getattr(value, self.field)
+
+        attrs = self.field.split('__')
+        for attr in attrs:
+            try:
+                value = getattr(value, attr, None)
+            except (ValueError, ObjectDoesNotExist):
+                # needs to have a primary key value before a many-to-many
+                # relationship can be used.
+                return None
+            if value is None:
+                return None
+
+        return value
 
 
 class ManyToManyWidget(Widget):
@@ -359,7 +399,7 @@ class ManyToManyWidget(Widget):
         self.model = model
         self.separator = separator
         self.field = field
-        super(ManyToManyWidget, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self, value, row=None, *args, **kwargs):
         if not value:

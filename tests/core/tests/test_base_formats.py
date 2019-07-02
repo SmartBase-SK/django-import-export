@@ -1,14 +1,7 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import os
 
 from django.test import TestCase
-
-try:
-    from django.utils.encoding import force_text
-except ImportError:
-    from django.utils.encoding import force_unicode as force_text
+from django.utils.encoding import force_text
 
 from import_export.formats import base_formats
 
@@ -74,3 +67,31 @@ class CSVTest(TestCase):
         with open(filename, self.format.get_read_mode()) as in_stream:
             data = force_text(in_stream.read())
         base_formats.CSV().create_dataset(data)
+
+
+class TSVTest(TestCase):
+
+    def setUp(self):
+        self.format = base_formats.TSV()
+
+    def test_import_mac(self):
+        filename = os.path.join(
+            os.path.dirname(__file__),
+            os.path.pardir,
+            'exports',
+            'books-mac.tsv')
+        with open(filename, self.format.get_read_mode()) as in_stream:
+            actual = in_stream.read()
+        expected = 'id\tname\tauthor_email\n1\tSome book\ttest@example.com\n'
+        self.assertEqual(actual, expected)
+
+    def test_import_unicode(self):
+        # importing tsv UnicodeEncodeError
+        filename = os.path.join(
+            os.path.dirname(__file__),
+            os.path.pardir,
+            'exports',
+            'books-unicode.tsv')
+        with open(filename, self.format.get_read_mode()) as in_stream:
+            data = force_text(in_stream.read())
+        base_formats.TSV().create_dataset(data)
