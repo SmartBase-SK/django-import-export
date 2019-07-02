@@ -547,9 +547,9 @@ class Resource(metaclass=DeclarativeMetaclass):
             # when only the original error is likely to be relevant
             if not isinstance(e, TransactionManagementError):
                 if row_number is not None:
-                    # +2 row_number (numbering starts from 0 and header is 0th line.
-                    # Add +2 for correct representation of line in file.)
-                    logging.exception("In row {}: {}".format(row_number+2, e), exc_info=e)
+                    # +1 row_number (numbering starts from 1 and header is 1th line.
+                    # Add +1 for correct representation of line in file.)
+                    logging.exception("In row {}: {}".format(row_number+1, e), exc_info=e)
                 else:
                     logging.exception(e, exc_info=e)
             tb_info = traceback.format_exc()
@@ -626,7 +626,7 @@ class Resource(metaclass=DeclarativeMetaclass):
                     instance_loader,
                     using_transactions=using_transactions,
                     dry_run=dry_run,
-                    row_number=row_number,
+                    row_number=i,
                     **kwargs
                 )
             result.increment_row_result_total(row_result)

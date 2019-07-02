@@ -28,19 +28,6 @@ SKIP_ADMIN_LOG = getattr(settings, 'IMPORT_EXPORT_SKIP_ADMIN_LOG', False)
 TMP_STORAGE_CLASS = getattr(settings, 'IMPORT_EXPORT_TMP_STORAGE_CLASS',
                             TempFolderStorage)
 
-#: These are the default formats for import and export. Whether they can be
-#: used or not is depending on their implementation in the tablib library.
-DEFAULT_FORMATS = (
-    # base_formats.CSV,
-    base_formats.XLS,
-    base_formats.XLSX,
-    # base_formats.TSV,
-    # base_formats.ODS,
-    # base_formats.JSON,
-    # base_formats.YAML,
-    # base_formats.HTML,
-)
-
 if isinstance(TMP_STORAGE_CLASS, str):
     TMP_STORAGE_CLASS = import_string(TMP_STORAGE_CLASS)
 
