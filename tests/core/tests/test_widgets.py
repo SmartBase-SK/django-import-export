@@ -1,20 +1,13 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-from decimal import Decimal
 from datetime import date, datetime, time, timedelta
-from unittest import SkipTest
+from decimal import Decimal
 
-from django.test.utils import override_settings
+from core.models import Author, Category
+
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.utils import timezone
 
 from import_export import widgets
-
-from core.models import (
-    Author,
-    Category,
-)
 
 
 class BooleanWidgetTest(TestCase):
@@ -124,6 +117,28 @@ class DurationWidgetTest(TestCase):
         self.assertEqual(self.widget.clean("1:57:00"), self.duration)
 
 
+class FloatWidgetTest(TestCase):
+
+    def setUp(self):
+        self.value = 11.111
+        self.widget = widgets.FloatWidget()
+
+    def test_clean(self):
+        self.assertEqual(self.widget.clean(11.111), self.value)
+
+    def test_render(self):
+        self.assertEqual(self.widget.render(self.value), self.value)
+
+    def test_clean_string_zero(self):
+        self.assertEqual(self.widget.clean("0"), 0.0)
+        self.assertEqual(self.widget.clean("0.0"), 0.0)
+
+    def test_clean_empty_string(self):
+        self.assertEqual(self.widget.clean(""), None)
+        self.assertEqual(self.widget.clean(" "), None)
+        self.assertEqual(self.widget.clean("\r\n\t"), None)
+
+
 class DecimalWidgetTest(TestCase):
 
     def setUp(self):
@@ -140,6 +155,11 @@ class DecimalWidgetTest(TestCase):
         self.assertEqual(self.widget.clean("0"), Decimal("0"))
         self.assertEqual(self.widget.clean("0.0"), Decimal("0"))
 
+    def test_clean_empty_string(self):
+        self.assertEqual(self.widget.clean(""), None)
+        self.assertEqual(self.widget.clean(" "), None)
+        self.assertEqual(self.widget.clean("\r\n\t"), None)
+
 
 class IntegerWidgetTest(TestCase):
 
@@ -154,6 +174,11 @@ class IntegerWidgetTest(TestCase):
         self.assertEqual(self.widget.clean("0"), self.value)
         self.assertEqual(self.widget.clean("0.0"), self.value)
 
+    def test_clean_empty_string(self):
+        self.assertEqual(self.widget.clean(""), None)
+        self.assertEqual(self.widget.clean(" "), None)
+        self.assertEqual(self.widget.clean("\n\t\r"), None)
+
 
 class ForeignKeyWidgetTest(TestCase):
 
@@ -162,7 +187,7 @@ class ForeignKeyWidgetTest(TestCase):
         self.author = Author.objects.create(name='Foo')
 
     def test_clean(self):
-        self.assertEqual(self.widget.clean(1), self.author)
+        self.assertEqual(self.widget.clean(self.author.id), self.author)
 
     def test_clean_empty(self):
         self.assertEqual(self.widget.clean(""), None)
@@ -192,7 +217,7 @@ class ManyToManyWidget(TestCase):
     def setUp(self):
         self.widget = widgets.ManyToManyWidget(Category)
         self.widget_name = widgets.ManyToManyWidget(Category, field="name")
-        self.cat1 = Category.objects.create(name=u'Cat úňíčóďě')
+        self.cat1 = Category.objects.create(name='Cat úňíčóďě')
         self.cat2 = Category.objects.create(name='Cat 2')
 
     def test_clean(self):
@@ -235,7 +260,33 @@ class ManyToManyWidget(TestCase):
         self.assertIn(self.cat1, cleaned_data)
 
     def test_render(self):
-        self.assertEqual(self.widget.render(Category.objects),
+        self.assertEqual(self.widget.render(Category.objects.order_by('id')),
                          "%s,%s" % (self.cat1.pk, self.cat2.pk))
-        self.assertEqual(self.widget_name.render(Category.objects),
-                         u"%s,%s" % (self.cat1.name, self.cat2.name))
+        self.assertEqual(self.widget_name.render(Category.objects.order_by('id')),
+                         "%s,%s" % (self.cat1.name, self.cat2.name))
+
+
+class JSONWidgetTest(TestCase):
+
+    def setUp(self):
+        self.value = {"value": 23}
+        self.widget = widgets.JSONWidget()
+
+    def test_clean(self):
+        self.assertEqual(self.widget.clean('{"value": 23}'), self.value)
+
+    def test_render(self):
+        self.assertEqual(self.widget.render(self.value), '{"value": 23}')
+
+    def test_clean_single_quoted_string(self):
+        self.assertEqual(self.widget.clean("{'value': 23}"), self.value)
+        self.assertEqual(self.widget.clean("{'value': null}"), {'value': None})
+
+    def test_clean_none(self):
+        self.assertEqual(self.widget.clean(None), None)
+        self.assertEqual(self.widget.clean('{"value": null}'), {'value': None})
+
+    def test_render_none(self):
+        self.assertEqual(self.widget.render(None), None)
+        self.assertEqual(self.widget.render(dict()), None)
+        self.assertEqual(self.widget.render({"value": None}), '{"value": null}')

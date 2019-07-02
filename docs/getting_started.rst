@@ -10,14 +10,14 @@ For example purposes, we'll use a simplified book app. Here is our
     class Author(models.Model):
         name = models.CharField(max_length=100)
 
-        def __unicode__(self):
+        def __str__(self):
             return self.name
 
 
     class Category(models.Model):
         name = models.CharField(max_length=100)
 
-        def __unicode__(self):
+        def __str__(self):
             return self.name
 
 
@@ -30,7 +30,7 @@ For example purposes, we'll use a simplified book app. Here is our
         price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
         categories = models.ManyToManyField(Category, blank=True)
 
-        def __unicode__(self):
+        def __str__(self):
             return self.name
 
 
@@ -58,10 +58,10 @@ Exporting data
 
 Now that we have defined a :class:`~import_export.resources.ModelResource` class,
 we can export books::
-    
+
     >>> from app.admin import BookResource
     >>> dataset = BookResource().export()
-    >>> print dataset.csv
+    >>> print(dataset.csv)
     id,name,author,author_email,imported,published,price,categories
     2,Some book,1,,0,2012-12-05,8.85,1
 
@@ -148,7 +148,7 @@ options::
     from import_export.fields import Field
 
     class BookResource(resources.ModelResource):
-        published = Field(column_name='published_date')
+        published = Field(attribute='published', column_name='published_date')
 
         class Meta:
             model = Book
@@ -229,7 +229,7 @@ Let's import some data!
     >>> book_resource = resources.modelresource_factory(model=Book)()
     >>> dataset = tablib.Dataset(['', 'New book'], headers=['id', 'name'])
     >>> result = book_resource.import_data(dataset, dry_run=True)
-    >>> print result.has_errors()
+    >>> print(result.has_errors())
     False
     >>> result = book_resource.import_data(dataset, dry_run=False)
 
@@ -286,7 +286,7 @@ To hook in the import export workflow, you can connect to ``post_import``, ``pos
 
     @receiver(post_export, dispatch_uid='balabala...')
     def _post_export(model, **kwargs):
-        # model is the actual model instance which after export 
+        # model is the actual model instance which after export
         pass
 
 
@@ -295,8 +295,11 @@ To hook in the import export workflow, you can connect to ``post_import``, ``pos
 Admin integration
 =================
 
+Exporting
+---------
+
 Exporting via list filters
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Admin integration is achieved by subclassing
 :class:`~import_export.admin.ImportExportModelAdmin` or one of the available
@@ -305,10 +308,13 @@ mixins (:class:`~import_export.admin.ImportMixin`,
 :class:`~import_export.admin.ImportExportMixin`)::
 
     # app/admin.py
+    from .models import Book
     from import_export.admin import ImportExportModelAdmin
 
     class BookAdmin(ImportExportModelAdmin):
         resource_class = BookResource
+
+    admin.site.register(Book, BookAdmin)
 
 .. figure:: _static/images/django-import-export-change.png
 
@@ -324,7 +330,7 @@ mixins (:class:`~import_export.admin.ImportMixin`,
 
 
 Exporting via admin action
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Another approach to exporting data is by subclassing
 :class:`~import_export.admin.ImportExportActionModelAdmin` which implements
@@ -341,6 +347,74 @@ objects selected on the change list page::
 .. figure:: _static/images/django-import-export-action.png
 
    A screenshot of the change view with Import and Export as an admin action.
+
+Note that to use the :class:`~import_export.admin.ExportMixin` or :class:`~import_export.admin.ExportActionMixin`, you must declare this mixin **before** ``admin.ModelAdmin``::
+
+    # app/admin.py
+    from django.contrib import admin
+    from import_export.admin import ExportActionMixin
+
+    class BookAdmin(ExportActionMixin, admin.ModelAdmin):
+        pass
+
+Note that :class:`~import_export.admin.ExportActionMixin` is declared first in the example above!
+
+
+Importing
+---------
+
+It is also possible to enable data import via standard Django admin interface. To do this subclass :class:`~import_export.admin.ImportExportModelAdmin` or use one of the available mixins, i.e.
+:class:`~import_export.admin.ImportMixin`, or :class:`~import_export.admin.ImportExportMixin`. Customizations are, of course, possible.
+
+
+Customize admin import forms
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It is possible to modify default import forms used in the model admin. For example, to add an additional field in the import form, subclass and extend the :class:`~import_export.forms.ImportForm` (note that you may want to also consider :class:`~import_export.forms.ConfirmImportForm` as importing is a two-step process).
+
+To use the customized form(s), overload :class:`~import_export.admin.ImportMixin` respective methods, i.e. :meth:`~import_export.admin.ImportMixin.get_import_form`, and also :meth:`~import_export.admin.ImportMixin.get_confirm_import_form` if need be.
+
+For example, imagine you want to import books for a specific author. You can extend the import forms to include ``author`` field to select the author from.
+
+Customize forms::
+
+    from django import forms
+
+    class CustomImportForm(ImportForm):
+        author = forms.ModelChoiceField(
+            queryset=Author.objects.all(),
+            required=True)
+
+    class CustomConfirmImportForm(ConfirmImportForm):
+        author = forms.ModelChoiceField(
+            queryset=Author.objects.all(),
+            required=True)
+
+Customize ``ModelAdmin``::
+
+    class CustomBookAdmin(ImportMixin, admin.ModelAdmin)
+        resource_class = BookResource
+
+        def get_import_form(self):
+            return CustomImportForm
+
+        def get_confirm_import_form(self):
+            return CustomConfirmImportForm
+
+        def get_form_kwargs(self, form, *args, **kwargs):
+            # pass on `author` to the kwargs for the custom confirm form
+            if isinstance(form, CustomImportForm):
+                if form.is_valid():
+                    author = form.cleaned_data['author']
+                    kwargs.update({'author': author.id})
+            return kwargs
+
+
+    admin.site.register(Book, CustomBookAdmin)
+
+To further customize admin imports, consider modifying the following :class:`~import_export.admin.ImportMixin` methods: :meth:`~import_export.admin.ImportMixin.get_form_kwargs`, :meth:`~import_export.admin.ImportMixin.get_import_resource_kwargs`, :meth:`~import_export.admin.ImportMixin.get_import_data_kwargs`.
+
+Using the above methods it is possible to customize import form initialization as well as importing customizations.
 
 
 .. seealso::

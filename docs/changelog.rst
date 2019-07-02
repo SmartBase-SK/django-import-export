@@ -2,6 +2,83 @@ Changelog
 =========
 
 
+2.0 (unreleased)
+----------------
+
+- Removed support for Django < 2.0
+- Removed support for Python < 3.5
+- feat: Support for Postgres JSONb Field (#904)
+
+1.2.0 (2019-01-10)
+------------------
+
+- feat: Better surfacing of validation errors in UI / optional model instance validation (#852)
+
+- chore: Use modern setuptools in setup.py (#862)
+
+- chore: Update URLs to use https:// (#863)
+
+- chore: remove outdated workarounds
+
+- chore: Run SQLite tests with in-memory database
+
+- fix: Change logging level (#832)
+
+- fix: Changed `get_instance()` return val (#842)
+
+1.1.0 (2018-10-02)
+------------------
+
+- fix: Django2.1 ImportExportModelAdmin export (#797) (#819)
+
+- setup: add django2.1 to test matrix
+
+- JSONWidget for jsonb fields (#803)
+
+- Add ExportActionMixin (#809)
+
+- Add Import Export Permissioning #608 (#804)
+
+- write_to_tmp_storage() for import_action() (#781)
+
+- follow relationships on ForeignKeyWidget #798
+
+- Update all pypi.python.org URLs to pypi.org
+
+- added test for tsv import
+
+- added unicode support for TSV for python 2
+
+- Added ExportViewMixin (#692)
+
+1.0.1 (2018-05-17)
+------------------
+
+- Make deep copy of fileds from class attr to instance attr (#550)
+
+- Fix #612: NumberWidget.is_empty() should strip the value if string type (#613)
+
+- Fix #713: last day isn't included in results qs (#779)
+
+- use Python3 compatible MySql driver in development (#706)
+
+- fix: warning U mode is deprecated in python 3 (#776)
+
+- refactor: easier overridding widgets and default field (#769)
+
+- Updated documentation regardign declaring fields (#735)
+
+- custom js for action form also handles grappelli (#719)
+
+- Use 'verbose_name' in breadcrumbs to match Django default (#732)
+
+- Add Resource.get_diff_class() (#745)
+
+- Fix and add polish translation (#747)
+
+- Restore raise_errors to before_import (#749)
+
+
 1.0.0 (2018-02-13)
 ------------------
 
@@ -107,7 +184,7 @@ Changelog
 
 - Append rows to Result object via function call to allow overriding (#462)
 
-- Add get_resource_kwargs to allow passing request to resource (#457) 
+- Add get_resource_kwargs to allow passing request to resource (#457)
 
 - Expose Django user to get_export_data() and export() (#447)
 
