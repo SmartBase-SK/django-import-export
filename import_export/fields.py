@@ -272,6 +272,8 @@ class PriceField(Field):
             value = round(Decimal(value), 5)
             related_object_type = ContentType.objects.get_for_model(obj)
 
+            if not obj.id:
+                obj.save()
             price, created = Price.not_nullable.update_or_create(
                 content_type_id=related_object_type.id,
                 object_id=obj.id,
