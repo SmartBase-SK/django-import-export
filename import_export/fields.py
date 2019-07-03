@@ -435,6 +435,7 @@ class ParentField(Field):
                             else:
                                 try:
                                     obj.move(Product.objects.translated(slug=value).first(), 'last-child')
+                                    obj = Product.objects.get(pk=obj.id)
                                 except AttributeError:
                                     # because TreeBeard
                                     Product.fix_tree()
