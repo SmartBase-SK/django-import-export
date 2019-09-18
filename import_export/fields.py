@@ -348,15 +348,15 @@ class AttributeField(Field):
         tmp = self.attribute.split('__')
         attr_id = int(tmp[1].partition('(')[-1].rpartition(')')[0])
 
-        try:
-            att_value = obj.option_values.get(group_id=attr_id)
+        att_value = obj.option_values.filter(group_id=attr_id)
 
-        except (ValueError, ObjectDoesNotExist):
+        att_count = att_value.count()
+        if att_count == 1:
+            return att_value.first().value.name
+        elif att_count > 1:
+            return ';'.join([att.value.name for att in att_value])
+        else:
             return None
-        except MultipleObjectsReturned:
-            raise MultipleObjectsReturned('Export error exception. Product#id={}, attr_id={}'.format(obj.id, attr_id))
-
-        return att_value.value.name
 
     def save(self, obj, data, is_m2m=False):
         if not self.readonly:
@@ -367,8 +367,10 @@ class AttributeField(Field):
 
             if value is '' or value is None:
                 return
-            else:
-                group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
+
+            values = value.strip().split(';')
+            group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
+            for value in values:
                 attr_option = AttributeOption.objects.filter(product_class=obj.product_class, group=group, translations__name=value)
                 if attr_option.count() == 0:
                     attr_option = AttributeOption(
@@ -383,7 +385,7 @@ class AttributeField(Field):
                 attr, created = AttributeOptionGroupValue.objects.update_or_create(
                     product=obj,
                     group=group,
-                    defaults={'value': attr_option},
+                    value=attr_option,
                 )
 
 
