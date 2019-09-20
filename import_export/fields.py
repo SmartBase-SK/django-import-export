@@ -368,9 +368,10 @@ class AttributeField(Field):
             if value is '' or value is None:
                 return
 
-            values = value.strip().split(';')
+            values = str(value).strip().split(';')
             group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
             for value in values:
+                value = value.strip()
                 attr_option = AttributeOption.objects.filter(product_class=obj.product_class, group=group, translations__name=value)
                 if attr_option.count() == 0:
                     attr_option = AttributeOption(
