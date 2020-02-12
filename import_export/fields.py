@@ -370,6 +370,10 @@ class AttributeField(Field):
 
             values = str(value).strip().split(';')
             group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
+
+            # delete old aogvs for this group, object combination (else just new values would be added to existing)
+            AttributeOptionGroupValue.objects.filter(product=obj, group=group).delete()
+
             for value in values:
                 value = value.strip()
                 attr_option = AttributeOption.objects.filter(product_class=obj.product_class, group=group, translations__name=value)
