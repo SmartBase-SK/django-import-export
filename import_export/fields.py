@@ -364,16 +364,16 @@ class AttributeField(Field):
             attr_id = int(tmp[1].partition('(')[-1].rpartition(')')[0])
             is_active = False if 'notactive' in tmp[1] else True
             value = self.clean(data)
+            group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
 
             if value is '' or value is None:
+                # delete old aogvs for this group
+                AttributeOptionGroupValue.objects.filter(product=obj, group=group).delete()
                 return
 
             values = str(value).strip().split(';')
-            group = AttributeOptionGroup.objects.get(id=attr_id, is_active=is_active)
 
-            # delete old aogvs for this group, object combination (else just new values would be added to existing)
-            AttributeOptionGroupValue.objects.filter(product=obj, group=group).delete()
-
+            exclude_delete = []
             for value in values:
                 value = value.strip()
                 attr_option = AttributeOption.objects.filter(product_class=obj.product_class, group=group, translations__name=value)
@@ -392,6 +392,10 @@ class AttributeField(Field):
                     group=group,
                     value=attr_option,
                 )
+                exclude_delete.append(attr.id)
+
+            # delete old aogvs for this group, except new values
+            AttributeOptionGroupValue.objects.filter(product=obj, group=group).exclude(id__in=exclude_delete).delete()
 
 
 class ParentField(Field):
